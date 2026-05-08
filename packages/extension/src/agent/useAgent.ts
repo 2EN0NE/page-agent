@@ -6,6 +6,7 @@ import type {
 	AgentStatus,
 	ExecutionResult,
 	HistoricalEvent,
+	SidecarActionEvent,
 	SupportedLanguage,
 } from '@page-agent/core'
 import type { LLMConfig } from '@page-agent/llms'
@@ -23,6 +24,12 @@ export interface AdvancedConfig {
 	experimentalLlmsTxt?: boolean
 	experimentalIncludeAllTabs?: boolean
 	disableNamedToolChoice?: boolean
+	/** Context observation window in minutes (default: 5) */
+	contextWindowMinutes?: number
+	/** Suggestion algorithms to enable (max 3) */
+	suggestionAlgorithms?: ('semantic_frequency' | 'prefix_match')[]
+	/** File path or directory for saving articles as Markdown (e.g. "~/Obsidian/Clips") */
+	articleSavePath?: string
 }
 
 export interface ExtConfig extends LLMConfig, AdvancedConfig {
@@ -38,6 +45,11 @@ export interface UseAgentResult {
 	execute: (task: string) => Promise<ExecutionResult>
 	stop: () => void
 	configure: (config: ExtConfig) => Promise<void>
+	/** Record a sidecar interaction as a history event */
+	recordSidecarAction: (
+		action: SidecarActionEvent['action'],
+		payload?: Record<string, unknown>
+	) => void
 }
 
 export function useAgent(): UseAgentResult {
@@ -51,7 +63,7 @@ export function useAgent(): UseAgentResult {
 	useEffect(() => {
 		chrome.storage.local.get(['llmConfig', 'language', 'advancedConfig']).then((result) => {
 			let llmConfig = (result.llmConfig as LLMConfig) ?? DEMO_CONFIG
-			const language = (result.language as SupportedLanguage) || undefined
+			const language = (result.language as SupportedLanguage) || 'zh-CN'
 			const advancedConfig = (result.advancedConfig as AdvancedConfig) ?? {}
 
 			// Auto-migrate legacy testing endpoints
@@ -127,6 +139,8 @@ export function useAgent(): UseAgentResult {
 			experimentalLlmsTxt,
 			experimentalIncludeAllTabs,
 			disableNamedToolChoice,
+			contextWindowMinutes,
+			suggestionAlgorithms,
 			...llmConfig
 		}: ExtConfig) => {
 			await chrome.storage.local.set({ llmConfig })
@@ -141,9 +155,31 @@ export function useAgent(): UseAgentResult {
 				experimentalLlmsTxt,
 				experimentalIncludeAllTabs,
 				disableNamedToolChoice,
+				contextWindowMinutes,
+				suggestionAlgorithms,
 			}
 			await chrome.storage.local.set({ advancedConfig })
 			setConfig({ ...llmConfig, ...advancedConfig, language })
+		},
+		[]
+	)
+
+	const recordSidecarAction = useCallback(
+		(action: SidecarActionEvent['action'], payload: Record<string, unknown> = {}) => {
+			const agent = agentRef.current
+			const event: SidecarActionEvent = {
+				type: 'sidecar_action',
+				action,
+				payload,
+				timestamp: Date.now(),
+			}
+			if (agent) {
+				// If agent is running, use the public API to maintain invariants
+				agent.addHistoryEvent(event)
+			} else {
+				// No agent running — update React state directly
+				setHistory((prev) => [...prev, event])
+			}
 		},
 		[]
 	)
@@ -157,5 +193,6 @@ export function useAgent(): UseAgentResult {
 		execute,
 		stop,
 		configure,
+		recordSidecarAction,
 	}
 }

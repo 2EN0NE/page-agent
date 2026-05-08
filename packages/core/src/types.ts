@@ -252,6 +252,23 @@ export interface AgentErrorEvent {
 }
 
 /**
+ * Sidecar action event - user interaction via the passive sidecar UI
+ * (B-region card actions, C-region suggestions, etc.)
+ */
+export interface SidecarActionEvent {
+	type: 'sidecar_action'
+	action:
+		| 'save_article'
+		| 'focus_field'
+		| 'fill_field'
+		| 'select_suggestion'
+		| 'send_chat'
+		| 'dismiss_suggestion'
+	payload: Record<string, unknown>
+	timestamp: number
+}
+
+/**
  * Union type for all history events
  */
 export type HistoricalEvent =
@@ -260,6 +277,7 @@ export type HistoricalEvent =
 	| UserTakeoverEvent
 	| RetryEvent
 	| AgentErrorEvent
+	| SidecarActionEvent
 
 /**
  * Agent execution status

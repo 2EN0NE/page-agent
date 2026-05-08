@@ -155,6 +155,16 @@ export class PageAgentCore extends EventTarget {
 		this.dispatchEvent(new Event('statuschange'))
 	}
 
+	/**
+	 * Add an external event to the history stream.
+	 * Use this instead of direct `agent.history.push()` to ensure
+	 * invariants and event emission are maintained.
+	 */
+	addHistoryEvent(event: HistoricalEvent): void {
+		this.history.push(event)
+		this.#emitHistoryChange()
+	}
+
 	/** Emit historychange event */
 	#emitHistoryChange(): void {
 		this.dispatchEvent(new Event('historychange'))

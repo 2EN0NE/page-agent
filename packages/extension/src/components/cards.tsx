@@ -5,21 +5,29 @@ import type {
 	HistoricalEvent,
 	ObservationEvent,
 	RetryEvent,
+	SidecarActionEvent,
 } from '@page-agent/core'
 import {
 	CheckCircle,
 	Eye,
+	Focus,
 	Globe,
 	Keyboard,
+	MessageSquare,
 	Mouse,
+	MousePointerClick,
 	MoveVertical,
 	RefreshCw,
+	Save,
 	Sparkles,
+	X,
 	XCircle,
 	Zap,
 } from 'lucide-react'
 import { Fragment, useState } from 'react'
 
+import { useI18n } from '@/i18n'
+import type { Translation } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 // Result card for done action
@@ -32,6 +40,7 @@ function ResultCard({
 	text: string
 	children?: React.ReactNode
 }) {
+	const { t } = useI18n()
 	return (
 		<div
 			className={cn(
@@ -51,7 +60,7 @@ function ResultCard({
 						success ? 'text-green-600 dark:text-green-400' : 'text-destructive'
 					)}
 				>
-					Result: {success ? 'Success' : 'Failed'}
+					{t.resultCard.title}: {success ? t.resultCard.success : t.resultCard.failed}
 				</span>
 			</div>
 			<p className="text-[12px] text-foreground pl-5 whitespace-pre-wrap">{text}</p>
@@ -100,9 +109,6 @@ function ReflectionSection({
 
 	return (
 		<div className="mb-2">
-			{/* <div className="text-[11px] font-semibold text-foreground uppercase tracking-wide mb-2">
-				Reflection
-			</div> */}
 			<div className="grid grid-cols-[14px_1fr] gap-x-2 gap-y-2">
 				{items.map((item) => (
 					<ReflectionItem key={item.label} icon={item.icon} value={item.value!} />
@@ -125,6 +131,7 @@ function ActionIcon({ name, className }: { name: string; className?: string }) {
 
 // Copy button with "Copied!" feedback
 function CopyButton({ text, label }: { text: string; label: string }) {
+	const { t } = useI18n()
 	const [copied, setCopied] = useState(false)
 
 	return (
@@ -137,7 +144,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 			}}
 			className="text-[9px] text-muted-foreground hover:text-foreground transition-colors border px-1 rounded shrink-0 cursor-pointer backdrop-blur-xs"
 		>
-			{copied ? 'Copied!' : label}
+			{copied ? t.resultCard.copied : label}
 		</button>
 	)
 }
@@ -157,6 +164,7 @@ function extractPrompt(rawRequest: unknown, role: 'system' | 'user'): string | n
 
 // Raw request/response section (collapsible tabs, for debugging)
 function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResponse?: unknown }) {
+	const { t } = useI18n()
 	const [activeTab, setActiveTab] = useState<'request' | 'response' | null>(null)
 
 	if (!rawRequest && !rawResponse) return null
@@ -185,7 +193,7 @@ function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResp
 								: 'text-muted-foreground border-transparent hover:text-foreground'
 						)}
 					>
-						Raw Request
+						{t.resultCard.rawRequest}
 					</button>
 				)}
 				{rawResponse != null && (
@@ -199,16 +207,16 @@ function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResp
 								: 'text-muted-foreground border-transparent hover:text-foreground'
 						)}
 					>
-						Raw Response
+						{t.resultCard.rawResponse}
 					</button>
 				)}
 			</div>
 			{content != null && (
 				<div className="relative mt-1.5">
 					<div className="absolute top-1 right-1 flex gap-1">
-						{systemPrompt && <CopyButton text={systemPrompt} label="Copy System" />}
-						{userPrompt && <CopyButton text={userPrompt} label="Copy User" />}
-						<CopyButton text={JSON.stringify(content, null, 4)} label="Copy" />
+						{systemPrompt && <CopyButton text={systemPrompt} label={t.resultCard.copySystem} />}
+						{userPrompt && <CopyButton text={userPrompt} label={t.resultCard.copyUser} />}
+						<CopyButton text={JSON.stringify(content, null, 4)} label={t.resultCard.copy} />
 					</div>
 					<pre className="p-2 pt-5 text-[10px] text-foreground/70 bg-muted rounded overflow-x-auto max-h-60 overflow-y-auto">
 						{JSON.stringify(content, null, 4)}
@@ -220,10 +228,11 @@ function RawSection({ rawRequest, rawResponse }: { rawRequest?: unknown; rawResp
 }
 
 function StepCard({ event }: { event: AgentStepEvent }) {
+	const { t } = useI18n()
 	return (
 		<div className="rounded-lg border-l-2 border-l-blue-500/50 border bg-muted/40 p-2.5">
 			<div className="text-[11px] font-semibold text-foreground tracking-wide mb-2">
-				Step #{event.stepIndex! + 1}
+				{t.stepCard.step} #{event.stepIndex! + 1}
 			</div>
 
 			{/* Reflection */}
@@ -233,7 +242,7 @@ function StepCard({ event }: { event: AgentStepEvent }) {
 			{event.action && (
 				<div>
 					<div className="text-[11px] font-semibold text-foreground tracking-wide mb-1">
-						Actions
+						{t.stepCard.actions}
 					</div>
 					<div className="flex items-start gap-2">
 						<ActionIcon
@@ -269,9 +278,6 @@ function StepCard({ event }: { event: AgentStepEvent }) {
 function ObservationCard({ event }: { event: ObservationEvent }) {
 	return (
 		<div className="rounded-lg border-l-2 border-l-green-500/50 border bg-muted/40 p-2.5">
-			{/* <div className="text-[11px] font-semibold text-foreground uppercase tracking-wide mb-2">
-				Observation
-			</div> */}
 			<div className="flex items-start gap-2">
 				<Eye className="size-3.5 text-green-500 shrink-0 mt-0.5" />
 				<span className="text-[11px] text-muted-foreground">{event.content}</span>
@@ -301,6 +307,87 @@ function ErrorCard({ event }: { event: AgentErrorEvent }) {
 				<span className="text-xs text-destructive">{event.message}</span>
 			</div>
 			<RawSection rawResponse={event.rawResponse} />
+		</div>
+	)
+}
+
+// Sidecar action card — renders user interactions from B/C regions
+function SidecarActionCard({ event }: { event: SidecarActionEvent }) {
+	const { t } = useI18n()
+	const getActionInfo = () => {
+		switch (event.action) {
+			case 'save_article':
+				return {
+					icon: <Save className="size-3 text-amber-500 shrink-0 mt-0.5" />,
+					label: t.sidecarAction.saveArticle,
+					color: 'text-amber-600 dark:text-amber-400',
+					bg: 'bg-amber-500/5 border-amber-500/20',
+				}
+			case 'focus_field':
+				return {
+					icon: <Focus className="size-3 text-blue-500 shrink-0 mt-0.5" />,
+					label: t.sidecarAction.focusField,
+					color: 'text-blue-600 dark:text-blue-400',
+					bg: 'bg-blue-500/5 border-blue-500/20',
+				}
+			case 'fill_field':
+				return {
+					icon: <Keyboard className="size-3 text-purple-500 shrink-0 mt-0.5" />,
+					label: t.sidecarAction.fillField,
+					color: 'text-purple-600 dark:text-purple-400',
+					bg: 'bg-purple-500/5 border-purple-500/20',
+				}
+			case 'select_suggestion':
+				return {
+					icon: <MousePointerClick className="size-3 text-green-500 shrink-0 mt-0.5" />,
+					label: t.sidecarAction.selectSuggestion,
+					color: 'text-green-600 dark:text-green-400',
+					bg: 'bg-green-500/5 border-green-500/20',
+				}
+			case 'send_chat':
+				return {
+					icon: <MessageSquare className="size-3 text-foreground shrink-0 mt-0.5" />,
+					label: t.sidecarAction.chat,
+					color: 'text-foreground',
+					bg: 'bg-muted/40 border-border',
+				}
+			case 'dismiss_suggestion':
+				return {
+					icon: <X className="size-3 text-muted-foreground shrink-0 mt-0.5" />,
+					label: t.sidecarAction.dismissSuggestion,
+					color: 'text-muted-foreground',
+					bg: 'bg-muted/20 border-border/50',
+				}
+		}
+	}
+
+	const info = getActionInfo()
+	const payload = event.payload
+	const payloadText = Object.entries(payload)
+		.filter(([, v]) => typeof v === 'string' || typeof v === 'number')
+		.map(([k, v]) => `${k}: ${v}`)
+		.join(' · ')
+
+	return (
+		<div className={cn('rounded-lg border-l-2 p-2.5', info.bg)}>
+			<div className="flex items-start gap-2">
+				{info.icon}
+				<div className="flex-1 min-w-0">
+					<span className={cn('text-[11px] font-medium', info.color)}>{info.label}</span>
+					{payloadText && (
+						<p className="text-[10px] text-muted-foreground truncate" title={payloadText}>
+							{payloadText}
+						</p>
+					)}
+				</div>
+				<span className="text-[9px] text-muted-foreground shrink-0">
+					{new Date(event.timestamp).toLocaleTimeString([], {
+						hour: '2-digit',
+						minute: '2-digit',
+						second: '2-digit',
+					})}
+				</span>
+			</div>
 		</div>
 	)
 }
@@ -337,22 +424,27 @@ export function EventCard({ event }: { event: HistoricalEvent }) {
 		return <ErrorCard event={event as AgentErrorEvent} />
 	}
 
+	if (event.type === 'sidecar_action') {
+		return <SidecarActionCard event={event as SidecarActionEvent} />
+	}
+
 	return null
 }
 
 // Activity card with animation
 export function ActivityCard({ activity }: { activity: AgentActivity }) {
+	const { t } = useI18n()
 	const getActivityInfo = () => {
 		switch (activity.type) {
 			case 'thinking':
-				return { text: 'Thinking...', color: 'text-blue-500' }
+				return { text: t.activityCard.thinking, color: 'text-blue-500' }
 			case 'executing':
-				return { text: `Executing ${activity.tool}...`, color: 'text-amber-500' }
+				return { text: `${t.activityCard.executing} ${activity.tool}...`, color: 'text-amber-500' }
 			case 'executed':
-				return { text: `Done: ${activity.tool}`, color: 'text-green-500' }
+				return { text: `${t.activityCard.done}: ${activity.tool}`, color: 'text-green-500' }
 			case 'retrying':
 				return {
-					text: `Retrying (${activity.attempt}/${activity.maxAttempts})...`,
+					text: `${t.activityCard.retrying} (${activity.attempt}/${activity.maxAttempts})...`,
 					color: 'text-amber-500',
 				}
 			case 'error':

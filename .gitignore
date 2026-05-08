@@ -40,3 +40,13 @@ package.json.bak
 .claude
 .cursor
 .gemini
+
+# pi session data
+.pi/
+
+# Plans & temp docs (session-specific)
+PLAN.md
+plans/
+
+# Playwright test results
+packages/extension/test-results/

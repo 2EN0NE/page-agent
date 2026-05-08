@@ -59,11 +59,8 @@ export function initPageController() {
 
 	chrome.runtime.onMessage.addListener((message, sender, sendResponse): true | undefined => {
 		if (message.type !== 'PAGE_CONTROL') {
-			// sendResponse({
-			// 	success: false,
-			// 	error: `[RemotePageController.ContentScript]: Invalid message type: ${message.type}`,
-			// })
-			return
+			// Let other listeners (e.g., sidecar) handle this message
+			return undefined
 		}
 
 		const { action, payload } = message

@@ -1,26 +1,28 @@
 import type { AgentStatus } from '@page-agent/core'
 import { Motion } from 'ai-motion'
-import { BookOpen, Globe } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { siGithub } from 'simple-icons'
 
 import { TypingAnimation } from '@/components/ui/typing-animation'
+import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 // Status dot indicator
 export function StatusDot({ status }: { status: AgentStatus }) {
+	const { t } = useI18n()
+
 	const colorClass = {
 		idle: 'bg-muted-foreground',
-		running: 'bg-blue-500',
-		completed: 'bg-green-500',
+		running: 'bg-amber-500',
+		completed: 'bg-blue-500',
 		error: 'bg-destructive',
 	}[status]
 
 	const label = {
-		idle: 'Ready',
-		running: 'Running',
-		completed: 'Done',
-		error: 'Error',
+		idle: t.status.idle,
+		running: t.status.running,
+		completed: t.status.completed,
+		error: t.status.error,
 	}[status]
 
 	return (
@@ -92,6 +94,7 @@ export function MotionOverlay({ active }: { active: boolean }) {
 
 // Empty state with logo and breathing glow
 export function EmptyState() {
+	const { t } = useI18n()
 	return (
 		<div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
 			<div className="relative select-none pointer-events-none">
@@ -100,14 +103,14 @@ export function EmptyState() {
 				<Logo className="relative size-20 opacity-80" />
 			</div>
 			<div>
-				<h2 className="text-base font-medium text-foreground mb-1">Page Agent Ext</h2>
+				<h2 className="text-base font-medium text-foreground mb-1">{t.emptyState.title}</h2>
 				<TypingAnimation
 					className="text-sm text-muted-foreground"
 					words={[
-						'Enter a task to automate this page',
-						'Execute multi-page tasks',
-						'Call this extension from your web page',
-						'Use this extension in your own agents',
+						t.emptyState.typing1,
+						t.emptyState.typing2,
+						t.emptyState.typing3,
+						t.emptyState.typing4,
 					]}
 					cursorStyle="underscore"
 					loop
@@ -119,7 +122,7 @@ export function EmptyState() {
 			</div>
 			<div className="flex items-center gap-3 mt-1 text-muted-foreground">
 				<a
-					href="https://github.com/alibaba/page-agent"
+					href="https://github.com/2EN0NE/page-agent"
 					target="_blank"
 					rel="noopener noreferrer"
 					className="hover:text-foreground transition-colors"
@@ -129,24 +132,12 @@ export function EmptyState() {
 						<path d={siGithub.path} />
 					</svg>
 				</a>
-				<a
-					href="https://alibaba.github.io/page-agent/docs/features/chrome-extension"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="hover:text-foreground transition-colors"
-					title="Documentation"
+				<span
+					className="text-xs hover:text-foreground transition-colors cursor-default"
+					title="Contact"
 				>
-					<BookOpen className="size-4" />
-				</a>
-				<a
-					href="https://alibaba.github.io/page-agent"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="hover:text-foreground transition-colors"
-					title="Website"
-				>
-					<Globe className="size-4" />
-				</a>
+					{t.footer.contact}
+				</span>
 			</div>
 		</div>
 	)

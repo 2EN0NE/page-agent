@@ -1,0 +1,160 @@
+/**
+ * FormDetector - Detects when the user is interacting with forms
+ * and generates contextual fill suggestions based on historical data.
+ *
+ * Uses pluggable SuggestionEngine algorithms:
+ * - semantic_frequency: label similarity + frequency weighting
+ * - prefix_match: prefix-based matching against historical values
+ */
+import { queryInputValues } from '@/lib/db'
+
+import { ContextObserver } from './ContextObserver'
+import { type SuggestionItem, isSensitiveField, runSuggestionAlgorithms } from './SuggestionEngine'
+
+export interface FormField {
+	tagName: string
+	type?: string
+	name?: string
+	id?: string
+	placeholder?: string
+	label?: string | null
+}
+
+export interface FormSuggestion {
+	field: FormField
+	value: string
+	confidence: number // 0-1
+	algorithm: string
+	explanation: string
+}
+
+export class FormDetector {
+	#observer: ContextObserver
+	#onSuggestions?: (suggestions: FormSuggestion[], fieldLabel: string) => void
+	#listeners: (() => void)[] = []
+	#inputDebounceTimer: number | null = null
+
+	constructor(
+		observer: ContextObserver,
+		onSuggestions?: (suggestions: FormSuggestion[], fieldLabel: string) => void
+	) {
+		this.#observer = observer
+		this.#onSuggestions = onSuggestions
+		this.#setupListeners()
+	}
+
+	dispose() {
+		this.#listeners.forEach((remove) => remove())
+		this.#listeners = []
+		if (this.#inputDebounceTimer) {
+			window.clearTimeout(this.#inputDebounceTimer)
+			this.#inputDebounceTimer = null
+		}
+	}
+
+	// ========================================================================
+	// Private
+	// ========================================================================
+
+	#setupListeners() {
+		const onFocus = async (e: FocusEvent) => {
+			const target = e.target as HTMLElement
+			if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+				const field = this.#extractField(target)
+				this.#observer.record('form_detected', { field })
+				await this.#generateAndEmitSuggestions(field, target.value)
+			}
+		}
+		document.addEventListener('focusin', onFocus, true)
+		this.#listeners.push(() => document.removeEventListener('focusin', onFocus, true))
+
+		const onInput = async (e: Event) => {
+			const target = e.target as HTMLInputElement | HTMLTextAreaElement
+			if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+				const field = this.#extractField(target)
+				// Debounce to avoid querying IndexedDB on every keystroke
+				if (this.#inputDebounceTimer) {
+					window.clearTimeout(this.#inputDebounceTimer)
+				}
+				this.#inputDebounceTimer = window.setTimeout(() => {
+					this.#inputDebounceTimer = null
+					this.#generateAndEmitSuggestions(field, target.value)
+				}, 300)
+			}
+		}
+		document.addEventListener('input', onInput, true)
+		this.#listeners.push(() => document.removeEventListener('input', onInput, true))
+	}
+
+	#extractField(target: HTMLInputElement | HTMLTextAreaElement): FormField {
+		return {
+			tagName: target.tagName,
+			type: target.type,
+			name: target.getAttribute('name') ?? undefined,
+			id: target.id || undefined,
+			placeholder: target.placeholder || undefined,
+			label: this.#getLabelText(target),
+		}
+	}
+
+	async #generateAndEmitSuggestions(field: FormField, currentValue: string) {
+		if (isSensitiveField(field)) return
+
+		// Read configured algorithms from storage
+		const configResult = await chrome.storage.local.get('advancedConfig')
+		const advancedConfig = (configResult.advancedConfig as Record<string, unknown>) ?? {}
+		const algorithmNames = (advancedConfig.suggestionAlgorithms as string[] | undefined) ?? [
+			'semantic_frequency',
+			'prefix_match',
+		]
+
+		const domain = new URL(window.location.href).hostname
+		const history = await queryInputValues({ domain, limit: 500 })
+
+		const items = runSuggestionAlgorithms(field, currentValue, history, algorithmNames)
+
+		if (items.length === 0) return
+
+		const suggestions: FormSuggestion[] = items.map((item) => ({
+			field,
+			value: item.value,
+			confidence: item.confidence,
+			algorithm: item.algorithm,
+			explanation: item.explanation,
+		}))
+
+		this.#onSuggestions?.(suggestions, field.label || field.name || field.placeholder || 'field')
+
+		// Also write to storage for sidepanel real-time sync
+		try {
+			await chrome.storage.local.set({
+				[`sidecarSuggestions_${this.#observer.tabId}`]: {
+					suggestions,
+					fieldLabel: field.label || field.name || field.placeholder || 'field',
+					url: window.location.href,
+					domain,
+					timestamp: Date.now(),
+				},
+			})
+		} catch {
+			// ignore storage errors
+		}
+	}
+
+	#getLabelText(el: HTMLElement): string | null {
+		const labelledBy = el.getAttribute('aria-labelledby')
+		if (labelledBy) {
+			const labelEl = document.getElementById(labelledBy)
+			if (labelEl) return labelEl.textContent?.trim() ?? null
+		}
+		const ariaLabel = el.getAttribute('aria-label')
+		if (ariaLabel) return ariaLabel
+		if (el.id) {
+			const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
+			if (label) return label.textContent?.trim() ?? null
+		}
+		const parentLabel = el.closest('label')
+		if (parentLabel) return parentLabel.textContent?.trim() ?? null
+		return (el as HTMLInputElement).placeholder || null
+	}
+}

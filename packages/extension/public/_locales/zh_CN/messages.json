@@ -1,11 +1,11 @@
 {
     "extName": {
-        "message": "Page Agent Ext"
+        "message": "Page Agent Sidecar"
     },
     "extDescription": {
-        "message": "AI 驱动的浏览器自动化助手，用自然语言控制网页。"
+        "message": "AI 驱动的浏览器副驾驶。持续观察你的浏览行为，提供被动式上下文建议。"
     },
     "extActionTitle": {
-        "message": "打开 Page Agent"
+        "message": "打开 Page Agent Sidecar"
     }
 }

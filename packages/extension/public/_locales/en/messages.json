@@ -1,11 +1,11 @@
 {
     "extName": {
-        "message": "Page Agent Ext"
+        "message": "Page Agent Sidecar"
     },
     "extDescription": {
-        "message": "AI-powered browser automation assistant. Control web pages with natural language."
+        "message": "AI-powered browser sidecar. Continuously observes your browsing and provides passive contextual suggestions."
     },
     "extActionTitle": {
-        "message": "Open Page Agent"
+        "message": "Open Page Agent Sidecar"
     }
 }
