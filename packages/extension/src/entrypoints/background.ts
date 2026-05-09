@@ -2,8 +2,12 @@ import { handlePageControlMessage } from '@/agent/RemotePageController.backgroun
 import { handleTabControlMessage, setupTabEventsPort } from '@/agent/TabsController.background'
 import {
 	clearOldContextEvents,
+	listAccuracySummaries,
+	queryAccuracySessions,
 	queryContextEvents,
 	queryInputValues,
+	saveAccuracySession,
+	saveAccuracySummary,
 	saveContextEvents,
 } from '@/lib/db'
 
@@ -96,6 +100,21 @@ async function handleDBQuery(
 				sendResponse({ success: true, values })
 				break
 			}
+			case 'query_accuracy_sessions': {
+				const opts = message.payload ?? {}
+				const sessions = await queryAccuracySessions({
+					domain: (opts.domain as string) ?? undefined,
+					windowMs: (opts.windowMs as number) ?? undefined,
+					limit: (opts.limit as number) ?? undefined,
+				})
+				sendResponse({ success: true, sessions })
+				break
+			}
+			case 'query_accuracy_summaries': {
+				const summaries = await listAccuracySummaries()
+				sendResponse({ success: true, summaries })
+				break
+			}
 			default:
 				sendResponse({ success: false, error: `Unknown DB action: ${message.action}` })
 		}
@@ -121,6 +140,21 @@ async function handleDBSync(
 				console.log(`[Background] Synced ${events.length} events from content script`)
 			}
 			sendResponse({ success: true, synced: events.length })
+		} else if (message.action === 'sync_accuracy_session') {
+			const session = message.payload?.session as
+				| import('@/lib/db').AccuracySessionRecord
+				| undefined
+			if (session) {
+				await saveAccuracySession(session)
+			}
+			sendResponse({ success: true })
+		} else if (message.action === 'sync_accuracy_summary') {
+			const summaries =
+				(message.payload?.summaries as import('@/lib/db').AlgorithmAccuracyRecord[]) ?? []
+			for (const summary of summaries) {
+				await saveAccuracySummary(summary)
+			}
+			sendResponse({ success: true, synced: summaries.length })
 		} else {
 			sendResponse({ success: false, error: `Unknown sync action: ${message.action}` })
 		}

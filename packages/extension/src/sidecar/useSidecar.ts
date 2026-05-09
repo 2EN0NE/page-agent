@@ -5,14 +5,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { saveArticle as saveArticleToDB } from '@/lib/db'
+import type { FormSuggestion } from '@/sidecar/FormDetector'
+import type { ReadingScore } from '@/sidecar/ReadingDetector'
 
-import type { FormSuggestion } from './FormDetector'
-import type { ReadingScore } from './ReadingDetector'
 import {
 	fillFieldInTab,
 	getActiveTabId,
 	getReadingScore,
 	getSidecarState,
+	recordAdoptionInTab,
 	triggerSaveArticle,
 } from './SidecarClient'
 import type { SidecarState } from './SidecarMessaging'
@@ -43,7 +44,7 @@ export function useSidecar(pollInterval = 3000) {
 			const val = result.sidecarEnabled
 			setInfo((prev) => ({
 				...prev,
-				enabled: val === undefined ? true : val,
+				enabled: (val === undefined ? true : val) as boolean,
 			}))
 		})
 	}, [])
@@ -147,6 +148,7 @@ export function useSidecar(pollInterval = 3000) {
 		suggestions: FormSuggestion[]
 		fieldLabel: string
 		url: string
+		sessionId?: string
 	} | null>(null)
 
 	useEffect(() => {
@@ -159,15 +161,19 @@ export function useSidecar(pollInterval = 3000) {
 								suggestions: FormSuggestion[]
 								fieldLabel: string
 								url: string
+								sessionId?: string
 						  }
 						| undefined
-					if (data) {
+					if (data && data.suggestions.length > 0) {
 						setFormSuggestions({
 							tabId,
 							suggestions: data.suggestions,
 							fieldLabel: data.fieldLabel,
 							url: data.url,
+							sessionId: data.sessionId,
 						})
+					} else {
+						setFormSuggestions(null)
 					}
 				}
 			}
@@ -185,6 +191,15 @@ export function useSidecar(pollInterval = 3000) {
 		[info.tabId]
 	)
 
+	const recordAdoption = useCallback(
+		async (sessionId: string, algorithm: string, value: string) => {
+			const tabId = info.tabId
+			if (!tabId) return false
+			return recordAdoptionInTab(tabId, sessionId, algorithm, value)
+		},
+		[info.tabId]
+	)
+
 	return {
 		...info,
 		refresh,
@@ -192,5 +207,6 @@ export function useSidecar(pollInterval = 3000) {
 		toggleSidecar,
 		formSuggestions,
 		fillField,
+		recordAdoption,
 	}
 }

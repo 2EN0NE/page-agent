@@ -57,6 +57,10 @@ export const en = {
 		thanks: 'Thanks!',
 		useful: 'Useful',
 		notUseful: 'Not useful',
+		thinking: 'Thinking...',
+		executing: 'Executing',
+		done: 'Done',
+		retrying: 'Retrying',
 	},
 
 	// Reading Card
@@ -84,6 +88,7 @@ export const en = {
 		semantic: 'Semantic',
 		prefix: 'Prefix',
 		filled: 'Filled',
+		source: 'Source',
 	},
 
 	// Chat Input
@@ -121,15 +126,53 @@ export const en = {
 		experimentalIncludeAllTabs: 'Experimental include all tabs',
 		contextWindow: 'Context Window (minutes)',
 		contextWindowDesc: 'How far back the Context Timeline looks for events.',
-		suggestionAlgorithms: 'Suggestion Algorithms (max 3)',
+		suggestionAlgorithms: 'Suggestion Algorithms (Configurable)',
 		algoSemanticFrequency: 'Semantic + Frequency',
 		algoPrefixMatch: 'Prefix Match',
 		suggestionAlgorithmsDesc:
-			'Each algorithm produces 1 suggestion. Total = selected count (max 3).',
+			'Each algorithm produces up to 5 suggestions. Deduplicated and ranked by confidence.',
+		accuracy: 'Accuracy',
+		accuracyHigh: 'High reliability',
+		accuracyModerate: 'Moderate reliability',
+		accuracyLow: 'Low reliability',
+		accuracyUnknown: 'Not enough data',
+		addCustomAlgorithm: 'Add Custom Algorithm',
+		accuracyDataStoredInBrowser:
+			'Suggestion history is stored locally in browser IndexedDB. Use Export to download as JSON.',
+		accuracyWindowDays: 'Suggestion History Window (days)',
+		accuracyWindowDaysDesc: 'Number of days to include in suggestion history calculations.',
+		enableAccuracyCollection: 'Collect suggestion history',
+		exportAccuracyData: 'Export suggestion history',
+		importAccuracyData: 'Import suggestion history',
+		exportSuccess: 'Export successful',
+		importSuccess: 'Import successful',
+		importError: 'Import failed: invalid file format',
+		clearAccuracyData: 'Clear suggestion history',
 		articleSavePath: 'Article Save Path',
 		articleSavePathDesc:
 			'Folder path for auto-saving articles as Markdown. Leave empty to store in extension only.',
 		testingApiNotice: 'You are using a testing API. Use at your own risk.',
+	},
+
+	// Algorithm Config Dialog
+	algorithmDialog: {
+		title: 'Custom Algorithm',
+		editTitle: 'Edit Algorithm',
+		name: 'Algorithm Name',
+		type: 'Type',
+		typeRuleBased: 'Rule-based',
+		typeSandboxJS: 'Sandbox JavaScript',
+		config: 'Configuration',
+		code: 'JavaScript Code',
+		codePlaceholder:
+			'function(field, prefix, history, maxResults) {\n  var results = [];\n  for (var i = 0; i < history.length; i++) {\n    results.push({\n      value: history[i].value,\n      confidence: 0.8,\n      algorithm: "My Algorithm",\n      explanation: "From history",\n      fieldKey: history[i].fieldKey\n    });\n  }\n  return results.slice(0, maxResults);\n}',
+		codeHelp:
+			'Receives (field, prefix, history, maxResults). Must return [{ value, confidence, algorithm, explanation, fieldKey }].',
+		configPlaceholder:
+			'{"rules":[{"fieldKeywords":["email"],"staticValues":[{"value":"user@example.com","score":0.9}]}]}',
+		configHelp:
+			'JSON with a "rules" array. Each rule: fieldKeywords, fieldNamePatterns, prefixes, staticValues, includeHistory, scoreMultiplier.',
+		description: 'Description',
 	},
 
 	// History
@@ -257,14 +300,6 @@ export const en = {
 	stepCard: {
 		step: 'Step',
 		actions: 'Actions',
-	},
-
-	// Activity Card
-	activityCard: {
-		thinking: 'Thinking...',
-		executing: 'Executing',
-		done: 'Done',
-		retrying: 'Retrying',
 	},
 
 	// Footer

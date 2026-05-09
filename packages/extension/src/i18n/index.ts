@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { type Translation, en } from './en'
 import { zh } from './zh'
 
-const translations: Record<string, Translation> = { en, zh }
+const translations = { en, zh } as unknown as Record<string, Translation>
 
 function getBrowserLang(): string {
 	const nav = navigator.language || 'zh-CN'
@@ -11,8 +11,8 @@ function getBrowserLang(): string {
 }
 
 function getTranslation(lang: string | undefined): Translation {
-	if (!lang) return zh
-	return translations[lang.startsWith('zh') ? 'zh' : 'en'] ?? zh
+	if (!lang) return zh as unknown as Translation
+	return (translations[lang.startsWith('zh') ? 'zh' : 'en'] ?? zh) as unknown as Translation
 }
 
 /**
@@ -21,7 +21,7 @@ function getTranslation(lang: string | undefined): Translation {
  */
 export function useI18n() {
 	const [lang, setLang] = useState<string>('zh')
-	const [t, setT] = useState<Translation>(zh)
+	const [t, setT] = useState<Translation>(zh as unknown as Translation)
 
 	useEffect(() => {
 		// Initial read

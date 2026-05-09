@@ -50,3 +50,5 @@ plans/
 
 # Playwright test results
 packages/extension/test-results/
+# TTSR / OMP AI rules
+.omp/

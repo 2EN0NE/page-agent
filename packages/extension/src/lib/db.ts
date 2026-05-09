@@ -2,7 +2,7 @@ import type { HistoricalEvent } from '@page-agent/core'
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
 const DB_NAME = 'page-agent-ext'
-const DB_VERSION = 3 // bumped for inputValues store
+const DB_VERSION = 4 // bumped for accuracy stores
 
 // ============================================================================
 // Existing: Session Records (Task-driven agent)
@@ -31,7 +31,9 @@ export type ContextEventType =
 	| 'page_visibility'
 	| 'reading_detected'
 	| 'form_detected'
-
+	| 'selection'
+	| 'hover'
+	| 'viewport'
 export interface ContextEventRecord {
 	id: string
 	tabId: number
@@ -99,6 +101,75 @@ export interface InputValueRecord {
 }
 
 // ============================================================================
+// Accuracy data (form suggestion quality tracking)
+// ============================================================================
+
+export interface ContextSnapshot {
+	pageTitle: string
+	url: string
+	domain: string
+	path: string
+	visibleHeadings: string[]
+	headingTokens: Record<string, number>
+	viewportTokens: Record<string, number>
+	articleTokens?: Record<string, number>
+	keyPhrases: string[]
+	contextEventIds?: string[]
+}
+export interface AccuracySessionRecord {
+	id: string
+	sessionId: string
+	timestamp: number
+	tabId: number
+	url: string
+	domain: string
+	path: string
+	field: {
+		tagName: string
+		type?: string
+		name?: string
+		id?: string
+		placeholder?: string
+		label?: string | null
+	}
+	prefix: string
+	algorithmOutputs: Record<
+		string,
+		{
+			suggestions: {
+				value: string
+				confidence: number
+				algorithm: string
+				explanation: string
+				fieldKey: string
+			}[]
+			topValue: string | null
+			topConfidence: number
+		}
+	>
+	outcome?: {
+		type: 'adopted' | 'self_filled' | 'ignored' | 'dismissed'
+		finalValue?: string
+		adoptedAlgorithm?: string
+		adoptedValue?: string
+		settledAt: number
+	}
+	contextSnapshot?: ContextSnapshot
+}
+
+export interface AlgorithmAccuracyRecord {
+	algorithmName: string
+	totalTriggers: number
+	adoptedCount: number
+	exactMatchCount: number
+	prefixMatchCount: number
+	partialMatchCount: number
+	missCount: number
+	score: number
+	lastUpdated: number
+}
+
+// ============================================================================
 // DB Schema
 // ============================================================================
 
@@ -144,6 +215,19 @@ interface PageAgentDB extends DBSchema {
 			'by-timestamp': number
 		}
 	}
+	accuracySessions: {
+		key: string
+		value: AccuracySessionRecord
+		indexes: {
+			'by-timestamp': number
+			'by-domain': string
+		}
+	}
+	accuracySummary: {
+		key: string
+		value: AlgorithmAccuracyRecord
+		indexes: object
+	}
 }
 
 let dbPromise: Promise<IDBPDatabase<PageAgentDB>> | null = null
@@ -177,6 +261,12 @@ function getDB() {
 					inputStore.createIndex('by-domain', 'domain')
 					inputStore.createIndex('by-field-key', 'fieldKey')
 					inputStore.createIndex('by-timestamp', 'timestamp')
+				}
+				if (oldVersion < 4) {
+					const accSessionStore = db.createObjectStore('accuracySessions', { keyPath: 'id' })
+					accSessionStore.createIndex('by-timestamp', 'timestamp')
+					accSessionStore.createIndex('by-domain', 'domain')
+					db.createObjectStore('accuracySummary', { keyPath: 'algorithmName' })
 				}
 			},
 		})
@@ -438,4 +528,64 @@ export async function queryInputValues(
 export async function clearInputValues(): Promise<void> {
 	const db = await getDB()
 	await db.clear('inputValues')
+}
+
+// ============================================================================
+// Accuracy Sessions
+// ============================================================================
+
+export async function saveAccuracySession(
+	session: AccuracySessionRecord
+): Promise<AccuracySessionRecord> {
+	const db = await getDB()
+	await db.put('accuracySessions', session)
+	return session
+}
+
+export async function queryAccuracySessions(
+	options: { domain?: string; windowMs?: number; limit?: number } = {}
+): Promise<AccuracySessionRecord[]> {
+	const { domain, windowMs = 90 * 24 * 60 * 60 * 1000, limit = 5000 } = options
+	const db = await getDB()
+	const since = Date.now() - windowMs
+	const all = await db.getAllFromIndex(
+		'accuracySessions',
+		'by-timestamp',
+		IDBKeyRange.lowerBound(since)
+	)
+	let filtered = all
+	if (domain !== undefined) filtered = filtered.filter((e) => e.domain === domain)
+	filtered.sort((a, b) => b.timestamp - a.timestamp)
+	return filtered.slice(0, limit)
+}
+
+export async function clearAccuracySessions(): Promise<void> {
+	const db = await getDB()
+	await db.clear('accuracySessions')
+}
+
+// ============================================================================
+// Accuracy Summary
+// ============================================================================
+
+export async function saveAccuracySummary(summary: AlgorithmAccuracyRecord): Promise<void> {
+	const db = await getDB()
+	await db.put('accuracySummary', summary)
+}
+
+export async function getAccuracySummary(
+	algorithmName: string
+): Promise<AlgorithmAccuracyRecord | undefined> {
+	const db = await getDB()
+	return db.get('accuracySummary', algorithmName)
+}
+
+export async function listAccuracySummaries(): Promise<AlgorithmAccuracyRecord[]> {
+	const db = await getDB()
+	return db.getAll('accuracySummary')
+}
+
+export async function clearAccuracySummaries(): Promise<void> {
+	const db = await getDB()
+	await db.clear('accuracySummary')
 }
