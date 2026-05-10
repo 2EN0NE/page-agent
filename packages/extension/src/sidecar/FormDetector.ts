@@ -159,7 +159,27 @@ export class FormDetector {
 			// ignore storage read errors
 		}
 
-		const items = runSuggestionAlgorithms(field, currentValue, filteredHistory, algorithmNames)
+		// Load page context keywords for semantic boost
+		let pageContextKeywords: string[] | undefined
+		try {
+			const ctxResult = await chrome.storage.local.get(`pageContext_${this.#observer.tabId}`)
+			const ctx = ctxResult[`pageContext_${this.#observer.tabId}`] as
+				| { keywords: string[]; timestamp: number }
+				| undefined
+			if (ctx && Date.now() - ctx.timestamp < 5 * 60 * 1000) {
+				pageContextKeywords = ctx.keywords
+			}
+		} catch {
+			// ignore
+		}
+
+		const items = runSuggestionAlgorithms(
+			field,
+			currentValue,
+			filteredHistory,
+			algorithmNames,
+			pageContextKeywords
+		)
 
 		if (items.length === 0) return []
 

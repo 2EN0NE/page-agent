@@ -23,7 +23,8 @@ export interface SuggestionAlgorithm {
 		field: FormField,
 		prefix: string,
 		history: InputValueRecord[],
-		maxResults: number
+		maxResults: number,
+		pageContextKeywords?: string[]
 	): SuggestionItem[]
 }
 
@@ -78,9 +79,11 @@ export class SemanticFrequencyAlgorithm implements SuggestionAlgorithm {
 		field: FormField,
 		_prefix: string,
 		history: InputValueRecord[],
-		maxResults: number
+		maxResults: number,
+		pageContextKeywords?: string[]
 	): SuggestionItem[] {
 		const fieldTokens = this.#tokenize([field.label, field.name, field.placeholder])
+		const contextSet = new Set(pageContextKeywords ?? [])
 
 		const scored = history
 			.filter((h) => this.#typeCompatible(field.type, h.fieldType))
@@ -89,7 +92,16 @@ export class SemanticFrequencyAlgorithm implements SuggestionAlgorithm {
 				const similarity = this.#jaccardSimilarity(fieldTokens, histTokens)
 				const frequencyBoost = Math.log1p(h.useCount) / Math.log1p(10)
 				const recencyBoost = this.#recencyBoost(h.timestamp)
-				const confidence = Math.min(1, similarity * 0.5 + frequencyBoost * 0.3 + recencyBoost * 0.2)
+				let contextBoost = 0
+				if (contextSet.size > 0) {
+					const valueWords = h.value.toLowerCase().split(/[^a-z0-9一-龥]+/)
+					const hits = valueWords.filter((w) => contextSet.has(w)).length
+					if (hits > 0) contextBoost = Math.min(0.15, hits * 0.05)
+				}
+				const confidence = Math.min(
+					1,
+					similarity * 0.5 + frequencyBoost * 0.3 + recencyBoost * 0.2 + contextBoost
+				)
 				return {
 					value: h.value,
 					confidence,
@@ -250,7 +262,8 @@ export function runSuggestionAlgorithms(
 	field: FormField,
 	prefix: string,
 	history: InputValueRecord[],
-	algorithmNames: string[]
+	algorithmNames: string[],
+	pageContextKeywords?: string[]
 ): SuggestionItem[] {
 	// Limit to MAX_ALGORITHMS
 	const names = algorithmNames.slice(0, MAX_ALGORITHMS)
@@ -263,7 +276,7 @@ export function runSuggestionAlgorithms(
 		}
 		const algo = new AlgorithmClass()
 		// Each algorithm produces exactly 1 best candidate
-		all.push(...algo.compute(field, prefix, history, 1))
+		all.push(...algo.compute(field, prefix, history, 1, pageContextKeywords))
 	}
 
 	// Merge: deduplicate by value, boost confidence if multiple algorithms agree

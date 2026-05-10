@@ -13,6 +13,7 @@ import {
 	saveInputValue,
 } from '@/lib/db'
 
+import { extractArticle } from './ArticleExtractor'
 import { isSensitiveField, isStopWord } from './SuggestionEngine'
 
 const FLUSH_INTERVAL_MS = 1000
@@ -59,6 +60,36 @@ export class ContextObserver {
 				() => this.#flush(),
 				config.flushIntervalMs ?? FLUSH_INTERVAL_MS
 			)
+			this.#extractPageContext()
+		}
+	}
+
+	async #extractPageContext() {
+		try {
+			const article = extractArticle(document)
+			const text = `${article.metadata.title} ${article.metadata.description ?? ''} ${article.markdown}`
+			const words = text
+				.toLowerCase()
+				.replace(/[^a-z0-9一-龥]+/g, ' ')
+				.split(/\s+/)
+				.filter((w) => w.length >= 3 && !isStopWord(w))
+			const freq = new Map<string, number>()
+			for (const w of words) {
+				freq.set(w, (freq.get(w) ?? 0) + 1)
+			}
+			const top = Array.from(freq.entries())
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 10)
+				.map(([w]) => w)
+			await chrome.storage.local.set({
+				[`pageContext_${this.#tabId}`]: {
+					keywords: top,
+					url: window.location.href,
+					timestamp: Date.now(),
+				},
+			})
+		} catch {
+			// ignore extraction errors
 		}
 	}
 
