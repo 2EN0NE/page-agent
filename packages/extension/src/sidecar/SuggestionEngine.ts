@@ -28,6 +28,46 @@ export interface SuggestionAlgorithm {
 }
 
 // ========================================================================
+// Shared: Stop words and utilities
+// ========================================================================
+
+const STOP_WORDS = new Set([
+	'on',
+	'in',
+	'the',
+	'a',
+	'an',
+	'to',
+	'of',
+	'for',
+	'with',
+	'at',
+	'by',
+	'from',
+	'search',
+	'submit',
+	'cancel',
+	'ok',
+	'yes',
+	'no',
+])
+
+function isStopWord(word: string): boolean {
+	return STOP_WORDS.has(word.toLowerCase())
+}
+
+function isCjk(char: string): boolean {
+	const code = char.charCodeAt(0)
+	return code >= 0x4e00 && code <= 0x9fa5
+}
+
+function minPrefixLength(prefix: string): number {
+	// CJK characters carry more information per character
+	if (prefix.length > 0 && isCjk(prefix[0])) return 1
+	return 2
+}
+
+// ========================================================================
 // Algorithm 1: Semantic Relevance + Frequency Matching
 // ========================================================================
 
@@ -80,7 +120,9 @@ export class SemanticFrequencyAlgorithm implements SuggestionAlgorithm {
 			if (!input) continue
 			const cleaned = input.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, ' ')
 			for (const word of cleaned.split(/\s+/)) {
-				if (word.length >= 2) tokens.add(word)
+				if (word.length < 2) continue
+				if (isStopWord(word)) continue
+				tokens.add(word)
 			}
 		}
 		return tokens
@@ -123,7 +165,7 @@ export class PrefixMatchAlgorithm implements SuggestionAlgorithm {
 		history: InputValueRecord[],
 		maxResults: number
 	): SuggestionItem[] {
-		if (!prefix || prefix.length < 1) return []
+		if (!prefix || prefix.length < minPrefixLength(prefix)) return []
 
 		const prefixLower = prefix.toLowerCase()
 
@@ -252,6 +294,8 @@ const SENSITIVE_PATTERNS = [
 	/credit.?card|card.?number|ccnum/i,
 	/bank.?account|routing/i,
 ]
+
+export { isStopWord }
 
 export function isSensitiveField(field: FormField): boolean {
 	const text = [field.label, field.name, field.placeholder, field.id, field.type].join(' ')

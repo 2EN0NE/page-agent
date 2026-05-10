@@ -13,7 +13,7 @@ import {
 	saveInputValue,
 } from '@/lib/db'
 
-import { isSensitiveField } from './SuggestionEngine'
+import { isSensitiveField, isStopWord } from './SuggestionEngine'
 
 const FLUSH_INTERVAL_MS = 1000
 const SCROLL_DEBOUNCE_MS = 500
@@ -321,6 +321,12 @@ export class ContextObserver {
 		if (isSensitiveField(field)) return
 		const value = target.value.trim()
 		if (!value || value.length > 200) return
+		// Reject values that are all stop words
+		const valueWords = value.toLowerCase().split(/[^a-z0-9一-龥]+/).filter((w) => w.length > 0)
+		if (valueWords.length > 0 && valueWords.every((w) => isStopWord(w))) return
+		// Reject values too similar to placeholder (UI noise)
+		const placeholder = target.placeholder?.trim().toLowerCase() ?? ''
+		if (placeholder && value.toLowerCase() === placeholder) return
 		const fieldKey = [label, target.getAttribute('name'), target.id, target.placeholder]
 			.filter(Boolean)
 			.join('|')
