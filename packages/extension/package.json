@@ -7,6 +7,7 @@
         "dev": "wxt",
         "build:ext": "wxt build",
         "zip": "wxt zip",
+        "test:e2e": "wxt build && npx playwright test",
         "postinstall": "wxt prepare"
     },
     "devDependencies": {

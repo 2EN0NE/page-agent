@@ -125,6 +125,23 @@ const pageInfo = await this.pageController.getPageInfo()
 2. Expose via async method in `PageController.ts`
 3. Export from `packages/page-controller/src/index.ts`
 
+## E2E Testing
+
+Every change that touches the browser extension **must** be validated end-to-end before submission.
+
+- **Skill reference**: `.claude/skills/e2e-testing.md` contains the full recipe, checklist, and debugging guide.
+- **Quick recipe**:
+  ```bash
+  npm run build:ext
+  cd packages/extension
+  npx playwright test
+  ```
+- **What to verify**:
+  1. Build produces a valid `.output/chrome-mv3/` extension.
+  2. UI regression: no layout occlusion, buttons have visible text, i18n keys synced.
+  3. Data flow: IndexedDB operations succeed.
+  4. Business flow: form focus → suggestion → fill works end-to-end.
+
 ## Code Standards
 
 - Explicit typing for exported/public APIs

@@ -39,6 +39,7 @@
         "lint": "eslint .",
         "ci": "node scripts/ci.js",
         "cleanup": "rm -rf packages/*/dist && rm -rf packages/*/.output",
+        "test:e2e": "cd packages/extension && npx playwright test",
         "prepare": "husky || true"
     },
     "devDependencies": {
