@@ -97,8 +97,38 @@ export class FormDetector {
 		}
 	}
 
+	/**
+	 * Public API for message-based suggestion requests (e.g. from content script handler).
+	 */
+	async suggestForField(field: FormField, prefix?: string): Promise<FormSuggestion[]> {
+		return this.#generateSuggestions(field, prefix ?? '')
+	}
+
 	async #generateAndEmitSuggestions(field: FormField, currentValue: string) {
-		if (isSensitiveField(field)) return
+		const suggestions = await this.#generateSuggestions(field, currentValue)
+		if (suggestions.length === 0) return
+
+		this.#onSuggestions?.(suggestions, field.label || field.name || field.placeholder || 'field')
+
+		// Also write to storage for sidepanel real-time sync
+		const domain = new URL(window.location.href).hostname
+		try {
+			await chrome.storage.local.set({
+				[`sidecarSuggestions_${this.#observer.tabId}`]: {
+					suggestions,
+					fieldLabel: field.label || field.name || field.placeholder || 'field',
+					url: window.location.href,
+					domain,
+					timestamp: Date.now(),
+				},
+			})
+		} catch {
+			// ignore storage errors
+		}
+	}
+
+	async #generateSuggestions(field: FormField, currentValue: string): Promise<FormSuggestion[]> {
+		if (isSensitiveField(field)) return []
 
 		// Read configured algorithms from storage
 		const configResult = await chrome.storage.local.get('advancedConfig')
@@ -113,32 +143,15 @@ export class FormDetector {
 
 		const items = runSuggestionAlgorithms(field, currentValue, history, algorithmNames)
 
-		if (items.length === 0) return
+		if (items.length === 0) return []
 
-		const suggestions: FormSuggestion[] = items.map((item) => ({
+		return items.map((item) => ({
 			field,
 			value: item.value,
 			confidence: item.confidence,
 			algorithm: item.algorithm,
 			explanation: item.explanation,
 		}))
-
-		this.#onSuggestions?.(suggestions, field.label || field.name || field.placeholder || 'field')
-
-		// Also write to storage for sidepanel real-time sync
-		try {
-			await chrome.storage.local.set({
-				[`sidecarSuggestions_${this.#observer.tabId}`]: {
-					suggestions,
-					fieldLabel: field.label || field.name || field.placeholder || 'field',
-					url: window.location.href,
-					domain,
-					timestamp: Date.now(),
-				},
-			})
-		} catch {
-			// ignore storage errors
-		}
 	}
 
 	#getLabelText(el: HTMLElement): string | null {

@@ -444,7 +444,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 			</div>
 
 			{/* attribute */}
-			<div className="text-[10px] text-muted-foreground bg-background fixed bottom-0 w-full flex justify-around">
+			<div className="text-[10px] text-muted-foreground bg-background flex justify-around py-2">
 				<span className="leading-loose">
 					{t.footer.builtWith}
 					<span className="underline hover:text-foreground cursor-default">2EN0NE</span>
