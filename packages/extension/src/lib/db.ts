@@ -426,13 +426,34 @@ export async function queryInputValues(
 	const db = await getDB()
 	const since = Date.now() - windowMs
 
-	// Use getAll for reliability
-	const all = await db.getAll('inputValues')
-	let filtered = all.filter((e) => e.timestamp >= since)
-	if (domain !== undefined) filtered = filtered.filter((e) => e.domain === domain)
-	if (fieldKey !== undefined) filtered = filtered.filter((e) => e.fieldKey === fieldKey)
-	filtered.sort((a, b) => b.timestamp - a.timestamp)
-	return filtered.slice(0, limit)
+	let candidates: InputValueRecord[]
+
+	if (domain !== undefined) {
+		// Scoped query: use domain index to avoid full table scan
+		candidates = await db.getAllFromIndex('inputValues', 'by-domain', domain)
+		candidates = candidates.filter((e) => e.timestamp >= since)
+	} else {
+		// Unscoped query: walk the timestamp index backwards with a cursor
+		// and stop once we have enough records within the time window.
+		candidates = []
+		const tx = db.transaction('inputValues', 'readonly')
+		const index = tx.store.index('by-timestamp')
+		const cursor = await index.openCursor(null, 'prev')
+		while (cursor) {
+			if (cursor.value.timestamp < since) break
+			candidates.push(cursor.value)
+			if (candidates.length >= limit * 2) break // oversample to allow post-filtering
+			await cursor.continue()
+		}
+		await tx.done
+	}
+
+	if (fieldKey !== undefined) {
+		candidates = candidates.filter((e) => e.fieldKey === fieldKey)
+	}
+
+	candidates.sort((a, b) => b.timestamp - a.timestamp)
+	return candidates.slice(0, limit)
 }
 
 export async function clearInputValues(): Promise<void> {
