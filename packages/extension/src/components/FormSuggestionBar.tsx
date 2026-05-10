@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { saveAnnotation } from '@/lib/db'
 import type { FormSuggestion } from '@/sidecar/FormDetector'
 
 interface FormSuggestionBarProps {
@@ -28,9 +29,23 @@ export function FormSuggestionBar({
 
 	if (dismissed || suggestions.length === 0) return null
 
-	const handleFill = (value: string) => {
+	const handleFill = async (value: string) => {
 		onFill(value)
 		setFilled((prev) => new Set(prev).add(value))
+		try {
+			await saveAnnotation({
+				tabId: 0,
+				url: '',
+				domain: '',
+				eventId: `suggestion-fill-${Date.now()}`,
+				label: 'useful',
+				annotatedAt: Date.now(),
+				notes: JSON.stringify({ fieldLabel, value, suggestions }),
+				contextSnapshot: [],
+			})
+		} catch {
+			// ignore annotation errors
+		}
 	}
 
 	return (
@@ -43,9 +58,32 @@ export function FormSuggestionBar({
 					</span>
 				</div>
 				<button
-					onClick={() => {
+					onClick={async () => {
 						setDismissed(true)
 						onDismiss?.()
+						// Write dismiss record to cross-context storage for penalty
+						try {
+							const result = await chrome.storage.local.get('dismissedSuggestions')
+							const dismissed = (result.dismissedSuggestions as Record<string, number>) ?? {}
+							dismissed[fieldLabel] = Date.now()
+							await chrome.storage.local.set({ dismissedSuggestions: dismissed })
+						} catch {
+							// ignore storage errors
+						}
+						try {
+							await saveAnnotation({
+								tabId: 0,
+								url: '',
+								domain: '',
+								eventId: `suggestion-dismiss-${Date.now()}`,
+								label: 'dismissed',
+								annotatedAt: Date.now(),
+								notes: JSON.stringify({ fieldLabel, suggestions }),
+								contextSnapshot: [],
+							})
+						} catch {
+							// ignore annotation errors
+						}
 					}}
 					className="text-muted-foreground hover:text-foreground cursor-pointer"
 					title={t.suggestionBar.dismiss}

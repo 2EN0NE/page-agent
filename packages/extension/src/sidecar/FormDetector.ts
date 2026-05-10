@@ -141,7 +141,25 @@ export class FormDetector {
 		const domain = new URL(window.location.href).hostname
 		const history = await queryInputValues({ domain, limit: 500 })
 
-		const items = runSuggestionAlgorithms(field, currentValue, history, algorithmNames)
+		// Exclude fieldKeys recently dismissed by the user (7-day penalty window)
+		let filteredHistory = history
+		try {
+			const dismissResult = await chrome.storage.local.get('dismissedSuggestions')
+			const dismissed = (dismissResult.dismissedSuggestions as Record<string, number>) ?? {}
+			const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+			const dismissedKeys = new Set(
+				Object.entries(dismissed)
+					.filter(([, ts]) => ts > cutoff)
+					.map(([key]) => key)
+			)
+			if (dismissedKeys.size > 0) {
+				filteredHistory = history.filter((h) => !dismissedKeys.has(h.fieldKey))
+			}
+		} catch {
+			// ignore storage read errors
+		}
+
+		const items = runSuggestionAlgorithms(field, currentValue, filteredHistory, algorithmNames)
 
 		if (items.length === 0) return []
 
