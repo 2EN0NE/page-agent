@@ -11,6 +11,10 @@ import {
 
 import { ContextObserver } from './ContextObserver'
 import { ReadingDetector } from './ReadingDetector'
+import {
+	SemanticFrequencyAlgorithm,
+	generateColdStartSuggestions,
+} from './SuggestionEngine'
 
 const TEST_TAG = '[SidecarE2ETest]'
 
@@ -121,6 +125,60 @@ export async function runSidecarE2ETest(): Promise<void> {
 			await clearOldContextEvents()
 			const events = await queryContextEvents({ windowMs: 24 * 60 * 60 * 1000, limit: 1000 })
 			if (events.length > 0) throw new Error(`Expected 0 events after clear, got ${events.length}`)
+		})
+	)
+
+	// ── Test 6: Bigram Jaccard matching ──
+	results.push(
+		await runTest('Bigram Jaccard field matching', async () => {
+			const algo = new SemanticFrequencyAlgorithm()
+			const field = {
+				tagName: 'INPUT',
+				type: 'email',
+				name: 'work_email',
+				label: 'Work Email',
+				placeholder: undefined,
+			}
+			const history = [
+				{
+					id: 'hist-1',
+					domain: 'example.com',
+					fieldKey: 'email_address|email',
+					fieldLabel: 'Email Address',
+					fieldName: 'email',
+					fieldPlaceholder: '',
+					fieldType: 'email',
+					value: 'alice@example.com',
+					timestamp: Date.now(),
+					useCount: 3,
+				},
+			]
+			const items = algo.compute(field, '', history as any, 3)
+			if (items.length === 0) throw new Error('Bigram match failed: expected at least 1 suggestion')
+			const top = items[0]
+			if (top.value !== 'alice@example.com') throw new Error(`Expected alice@example.com, got ${top.value}`)
+			if (top.confidence < 0.3) throw new Error(`Confidence too low: ${top.confidence}`)
+		})
+	)
+
+	// ── Test 7: Cold-start fallback ──
+	results.push(
+		await runTest('Cold-start fallback suggestions', async () => {
+			const field = {
+				tagName: 'INPUT',
+				type: 'email' as const,
+				name: 'email',
+				label: 'Email',
+				placeholder: 'your.email@company.com',
+			}
+			const suggestions = generateColdStartSuggestions(field)
+			if (suggestions.length === 0) throw new Error('Expected cold-start suggestions for email field')
+			const placeholderHint = suggestions.find((s) => s.value === 'your.email@company.com')
+			if (!placeholderHint) throw new Error('Placeholder hint missing')
+			const emailTemplate = suggestions.find((s) => s.value === 'user@example.com')
+			if (!emailTemplate) throw new Error('Email template missing')
+			if (emailTemplate.confidence >= placeholderHint.confidence)
+				throw new Error('Email template confidence should be lower than placeholder hint')
 		})
 	)
 

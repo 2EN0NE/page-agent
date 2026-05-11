@@ -50,3 +50,4 @@ plans/
 
 # Playwright test results
 packages/extension/test-results/
+.pnpm-store/

@@ -9,7 +9,7 @@
 import { queryInputValues } from '@/lib/db'
 
 import { ContextObserver } from './ContextObserver'
-import { type SuggestionItem, isSensitiveField, runSuggestionAlgorithms } from './SuggestionEngine'
+import { type SuggestionItem, generateColdStartSuggestions, isSensitiveField, runSuggestionAlgorithms } from './SuggestionEngine'
 
 export interface FormField {
 	tagName: string
@@ -181,6 +181,16 @@ export class FormDetector {
 			pageContextKeywords
 		)
 
+		if (items.length === 0 && filteredHistory.length < 5) {
+			const coldStart = generateColdStartSuggestions(field)
+			return coldStart.map((item) => ({
+				field,
+				value: item.value,
+				confidence: item.confidence,
+				algorithm: item.algorithm,
+				explanation: item.explanation,
+			}))
+		}
 		if (items.length === 0) return []
 
 		return items.map((item) => ({
