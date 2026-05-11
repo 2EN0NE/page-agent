@@ -286,18 +286,22 @@ export class ContextObserver {
 		try {
 			await saveContextEvents(batch)
 			console.log(`[ContextObserver] Flushed ${batch.length} events to IndexedDB`)
-			// Sync to background for global cross-tab access
+			// Sync to background for global cross-tab access only when enabled
 			// (content script and background have different origins → different IndexedDBs)
-			chrome.runtime
-				.sendMessage({
-					type: 'SYNC_DB',
-					action: 'sync_context_events',
-					payload: { events: batch },
-				})
-				.catch((err) => {
-					// Silently ignore sync errors — local DB is the source of truth
-					console.warn('[ContextObserver] Background sync failed:', err)
-				})
+			const configResult = await chrome.storage.local.get('advancedConfig')
+			const advancedConfig = (configResult.advancedConfig as Record<string, unknown>) ?? {}
+			if (advancedConfig.crossTabContextSync !== false) {
+				chrome.runtime
+					.sendMessage({
+						type: 'SYNC_DB',
+						action: 'sync_context_events',
+						payload: { events: batch },
+					})
+					.catch((err) => {
+						// Silently ignore sync errors — local DB is the source of truth
+						console.warn('[ContextObserver] Background sync failed:', err)
+					})
+			}
 		} catch (err) {
 			console.error('[ContextObserver] Flush failed:', err)
 			// Re-enqueue failed events at the BACK (not front) so new events

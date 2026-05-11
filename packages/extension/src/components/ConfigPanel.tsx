@@ -49,6 +49,9 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 		new Set(config?.suggestionAlgorithms ?? ['semantic_frequency', 'prefix_match'])
 	)
 	const [articleSavePath, setArticleSavePath] = useState(config?.articleSavePath ?? '')
+	const [crossTabContextSync, setCrossTabContextSync] = useState(
+		config?.crossTabContextSync ?? true
+	)
 	const [advancedOpen, setAdvancedOpen] = useState(false)
 	const [saving, setSaving] = useState(false)
 	const [userAuthToken, setUserAuthToken] = useState('')
@@ -73,6 +76,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 			new Set(config?.suggestionAlgorithms ?? ['semantic_frequency', 'prefix_match'])
 		)
 		setArticleSavePath(config?.articleSavePath ?? '')
+		setCrossTabContextSync(config?.crossTabContextSync ?? true)
 	}
 
 	// Poll for user auth token every second until found
@@ -126,6 +130,7 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 					| 'prefix_match'
 				)[],
 				articleSavePath: articleSavePath || undefined,
+				crossTabContextSync,
 			})
 		} finally {
 			setSaving(false)
@@ -333,6 +338,16 @@ export function ConfigPanel({ config, onSave, onClose }: ConfigPanelProps) {
 						<Switch
 							checked={experimentalIncludeAllTabs}
 							onCheckedChange={setExperimentalIncludeAllTabs}
+						/>
+					</label>
+
+					<label className="flex items-center justify-between cursor-pointer">
+						<span className="text-xs text-muted-foreground">
+							{t.settings.crossTabContextSync}
+						</span>
+						<Switch
+							checked={crossTabContextSync}
+							onCheckedChange={setCrossTabContextSync}
 						/>
 					</label>
 

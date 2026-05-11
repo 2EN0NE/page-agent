@@ -129,6 +129,7 @@ export const en = {
 		articleSavePath: 'Article Save Path',
 		articleSavePathDesc:
 			'Folder path for auto-saving articles as Markdown. Leave empty to store in extension only.',
+		crossTabContextSync: 'Cross-tab context sync',
 		testingApiNotice: 'You are using a testing API. Use at your own risk.',
 	},
 

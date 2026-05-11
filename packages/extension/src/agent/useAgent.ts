@@ -30,6 +30,8 @@ export interface AdvancedConfig {
 	suggestionAlgorithms?: ('semantic_frequency' | 'prefix_match')[]
 	/** File path or directory for saving articles as Markdown (e.g. "~/Obsidian/Clips") */
 	articleSavePath?: string
+	/** Sync context events to background IndexedDB for cross-tab queries (default: true) */
+	crossTabContextSync?: boolean
 }
 
 export interface ExtConfig extends LLMConfig, AdvancedConfig {

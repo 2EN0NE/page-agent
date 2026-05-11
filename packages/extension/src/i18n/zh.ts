@@ -127,6 +127,7 @@ export const zh = {
 		suggestionAlgorithmsDesc: '每个算法产生1条建议。总数 = 选中数量（最多3）。',
 		articleSavePath: '文章保存路径',
 		articleSavePathDesc: '自动保存 Markdown 文章的文件夹路径。留空则仅在扩展中存储。',
+		crossTabContextSync: '跨标签页上下文同步',
 		testingApiNotice: '你正在使用测试 API，风险自负。',
 	},
 
