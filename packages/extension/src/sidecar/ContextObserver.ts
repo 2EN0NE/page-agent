@@ -48,6 +48,9 @@ export class ContextObserver {
 	#lastScrollY = 0
 	#lastScrollTime = 0
 	#pageStartTime = Date.now()
+	#lastViewportText: string | null = null
+	#hoverTimer: number | null = null
+	#lastHoveredElement: string | null = null
 	#isVisible = !document.hidden
 
 	constructor(tabId: number, config: ContextObserverConfig = {}) {
@@ -120,6 +123,7 @@ export class ContextObserver {
 		this.#mutationObserver = null
 		if (this.#scrollTimer) window.clearTimeout(this.#scrollTimer)
 		if (this.#mutationTimer) window.clearTimeout(this.#mutationTimer)
+		if (this.#hoverTimer) window.clearTimeout(this.#hoverTimer)
 		this.#flush() // final flush
 	}
 
@@ -177,6 +181,17 @@ export class ContextObserver {
 					duration,
 					velocity: duration > 0 ? Math.abs(delta) / duration : 0,
 				})
+
+				// Record viewport content if it changed
+				const viewportText = this.#getViewportText()
+				if (viewportText && viewportText !== this.#lastViewportText) {
+					this.#lastViewportText = viewportText
+					this.record('viewport', {
+						scrollY,
+						viewportText,
+						headings: this.#getVisibleHeadings(),
+					})
+				}
 			}, SCROLL_DEBOUNCE_MS)
 		}
 		window.addEventListener('scroll', onScroll, { passive: true })
@@ -274,6 +289,50 @@ export class ContextObserver {
 		} else {
 			console.warn('[ContextObserver] document.body not available, skipping MutationObserver')
 		}
+
+		// Text selection
+		let lastSelection = ''
+		const onSelectionChange = () => {
+			const selection = document.getSelection()
+			const text = selection?.toString().trim().slice(0, 500) ?? ''
+			if (text && text !== lastSelection) {
+				lastSelection = text
+				const anchorNode = selection?.anchorNode?.parentElement
+				this.record('selection', {
+					text,
+					tagName: anchorNode?.tagName ?? null,
+					id: anchorNode?.id ?? null,
+				})
+			}
+		}
+		document.addEventListener('selectionchange', onSelectionChange)
+		this.#listeners.push(() => document.removeEventListener('selectionchange', onSelectionChange))
+
+		// Hover (debounced, per-element dedup)
+		const onMouseOver = (e: MouseEvent) => {
+			const target = e.target as HTMLElement
+			if (!target) return
+			const elementKey = `${target.tagName}#${target.id}.${target.className}`
+			if (elementKey === this.#lastHoveredElement) return
+
+			if (this.#hoverTimer) {
+				window.clearTimeout(this.#hoverTimer)
+			}
+			this.#hoverTimer = window.setTimeout(() => {
+				this.#hoverTimer = null
+				this.#lastHoveredElement = elementKey
+				this.record('hover', {
+					tagName: target.tagName,
+					id: target.id || null,
+					className: target.className || null,
+					text: target.textContent?.slice(0, 200) ?? null,
+					x: e.clientX,
+					y: e.clientY,
+				})
+			}, 800)
+		}
+		document.addEventListener('mouseover', onMouseOver, true)
+		this.#listeners.push(() => document.removeEventListener('mouseover', onMouseOver, true))
 	}
 
 	// ========================================================================
@@ -336,6 +395,46 @@ export class ContextObserver {
 		if (parentLabel) return parentLabel.textContent?.trim() ?? null
 		// placeholder as fallback
 		return (el as HTMLInputElement).placeholder || null
+	}
+
+	/**
+	 * Extract visible text from viewport elements (headings, paragraphs, list items).
+	 */
+	#getViewportText(): string | null {
+		try {
+			const elements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, td, th')
+			const texts: string[] = []
+			for (const el of elements) {
+				const rect = el.getBoundingClientRect()
+				if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
+					const text = el.textContent?.trim()
+					if (text) texts.push(text)
+				}
+			}
+			return texts.slice(0, 20).join(' | ').slice(0, 1000) || null
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Extract visible heading texts from the viewport.
+	 */
+	#getVisibleHeadings(): string[] {
+		try {
+			const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
+			const result: string[] = []
+			for (const h of headings) {
+				const rect = h.getBoundingClientRect()
+				if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
+					const text = h.textContent?.trim()
+					if (text) result.push(text)
+				}
+			}
+			return result.slice(0, 10)
+		} catch {
+			return []
+		}
 	}
 
 	/**

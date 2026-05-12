@@ -18,6 +18,27 @@ import { DEMO_CONFIG, migrateLegacyEndpoint } from './constants'
 /** Language preference: undefined means follow system */
 export type LanguagePreference = SupportedLanguage | undefined
 
+export interface AlgorithmConfig {
+	id: string
+	name: string
+	type: 'builtin' | 'rule_based' | 'sandbox_js'
+	enabled: boolean
+	description?: string
+	/** For builtin: the source algorithm identifier */
+	source?: string
+	/** For rule_based: configuration object */
+	config?: Record<string, unknown>
+	/** For sandbox_js: JavaScript code */
+	code?: string
+}
+
+export interface CustomAlgorithmConfig {
+	name: string
+	type: 'rule_based' | 'sandbox_js'
+	config: Record<string, unknown>
+	code?: string
+}
+
 export interface AdvancedConfig {
 	maxSteps?: number
 	systemInstruction?: string
@@ -26,12 +47,20 @@ export interface AdvancedConfig {
 	disableNamedToolChoice?: boolean
 	/** Context observation window in minutes (default: 5) */
 	contextWindowMinutes?: number
-	/** Suggestion algorithms to enable (max 3) */
+	/** Suggestion algorithms to enable (max 3) — DEPRECATED: use algorithms instead */
 	suggestionAlgorithms?: ('semantic_frequency' | 'prefix_match')[]
 	/** File path or directory for saving articles as Markdown (e.g. "~/Obsidian/Clips") */
 	articleSavePath?: string
 	/** Sync context events to background IndexedDB for cross-tab queries (default: true) */
 	crossTabContextSync?: boolean
+	/** Number of days to include in accuracy calculation (default: 30) */
+	accuracyWindowDays?: number
+	/** Whether to collect accuracy data (default: true) */
+	enableAccuracyCollection?: boolean
+	/** Custom algorithm configurations — DEPRECATED: use algorithms instead */
+	customAlgorithms?: CustomAlgorithmConfig[]
+	/** Unified algorithm configurations (replaces suggestionAlgorithms + customAlgorithms) */
+	algorithms?: AlgorithmConfig[]
 }
 
 export interface ExtConfig extends LLMConfig, AdvancedConfig {
@@ -67,6 +96,40 @@ export function useAgent(): UseAgentResult {
 			let llmConfig = (result.llmConfig as LLMConfig) ?? DEMO_CONFIG
 			const language = (result.language as SupportedLanguage) || 'zh-CN'
 			const advancedConfig = (result.advancedConfig as AdvancedConfig) ?? {}
+
+			// Migrate old suggestionAlgorithms/customAlgorithms to new algorithms array
+			if (
+				!advancedConfig.algorithms &&
+				(advancedConfig.suggestionAlgorithms || advancedConfig.customAlgorithms)
+			) {
+				const algorithms: AlgorithmConfig[] = []
+				for (const algo of advancedConfig.suggestionAlgorithms ?? [
+					'semantic_frequency',
+					'prefix_match',
+				]) {
+					algorithms.push({
+						id: algo,
+						name: algo === 'semantic_frequency' ? 'Semantic Frequency' : 'Prefix Match',
+						type: 'builtin',
+						enabled: true,
+						source: algo,
+					})
+				}
+				for (const custom of advancedConfig.customAlgorithms ?? []) {
+					algorithms.push({
+						id: `custom_${custom.name}`,
+						name: custom.name,
+						type: custom.type,
+						enabled: true,
+						config: custom.config,
+						code: custom.code,
+					})
+				}
+				advancedConfig.algorithms = algorithms
+				delete advancedConfig.suggestionAlgorithms
+				delete advancedConfig.customAlgorithms
+				chrome.storage.local.set({ advancedConfig })
+			}
 
 			// Auto-migrate legacy testing endpoints
 			const migrated = migrateLegacyEndpoint(llmConfig)
@@ -142,7 +205,10 @@ export function useAgent(): UseAgentResult {
 			experimentalIncludeAllTabs,
 			disableNamedToolChoice,
 			contextWindowMinutes,
-			suggestionAlgorithms,
+			articleSavePath,
+			accuracyWindowDays,
+			enableAccuracyCollection,
+			algorithms,
 			...llmConfig
 		}: ExtConfig) => {
 			await chrome.storage.local.set({ llmConfig })
@@ -158,7 +224,10 @@ export function useAgent(): UseAgentResult {
 				experimentalIncludeAllTabs,
 				disableNamedToolChoice,
 				contextWindowMinutes,
-				suggestionAlgorithms,
+				articleSavePath,
+				accuracyWindowDays,
+				enableAccuracyCollection,
+				algorithms,
 			}
 			await chrome.storage.local.set({ advancedConfig })
 			setConfig({ ...llmConfig, ...advancedConfig, language })

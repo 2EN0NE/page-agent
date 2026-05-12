@@ -188,6 +188,25 @@ export async function fillFieldInTab(tabId: number, value: string): Promise<bool
 	}
 }
 
+export async function recordAdoptionInTab(
+	tabId: number,
+	sessionId: string,
+	algorithm: string,
+	value: string
+): Promise<boolean> {
+	if (!isExtensionValid()) return false
+	try {
+		const res = await chrome.tabs.sendMessage(tabId, {
+			type: 'SIDECAR',
+			action: 'record_adoption',
+			payload: { sessionId, algorithm, value },
+		})
+		return res?.success ?? false
+	} catch (err) {
+		return handleContextError(err, 'recordAdoptionInTab') ?? false
+	}
+}
+
 export async function getActiveTabId(): Promise<number | null> {
 	if (!isExtensionValid()) return null
 	try {

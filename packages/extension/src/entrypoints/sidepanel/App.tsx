@@ -347,7 +347,6 @@ export default function App() {
 				config={config}
 				onSave={async (newConfig) => {
 					await configure(newConfig)
-					setView({ name: 'chat' })
 				}}
 				onClose={() => setView({ name: 'chat' })}
 			/>
@@ -576,6 +575,7 @@ export default function App() {
 						<FormSuggestionBar
 							fieldLabel={sidecar.formSuggestions.fieldLabel}
 							suggestions={sidecar.formSuggestions.suggestions}
+							sessionId={sidecar.formSuggestions.sessionId}
 							onFill={(value) => {
 								sidecar.fillField(value)
 								handleSidecarAction('select_suggestion', {
@@ -583,6 +583,9 @@ export default function App() {
 									value,
 									url: sidecar.formSuggestions!.url,
 								})
+							}}
+							onAdopt={(sessionId, algorithm, value) => {
+								sidecar.recordAdoption(sessionId, algorithm, value)
 							}}
 							onDismiss={() => {
 								chrome.storage.local.remove(`sidecarForms_${sidecar.tabId}`)

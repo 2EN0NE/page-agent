@@ -26,6 +26,7 @@ export interface SidecarMessage {
 		| 'query_context_events'
 		| 'clear_context_events'
 		| 'fill_field'
+		| 'record_adoption'
 		| 'focus_field'
 		| 'focus_field_by_selector'
 		| 'scan_page_forms'

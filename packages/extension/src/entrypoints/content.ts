@@ -1,12 +1,16 @@
 import { initPageController } from '@/agent/RemotePageController.content'
 import { clearOldContextEvents, queryContextEvents, saveArticle } from '@/lib/db'
+import { pluginManager } from '@/sidecar/AlgorithmPluginManager'
 import { type ArticleExtraction, extractArticle } from '@/sidecar/ArticleExtractor'
 import { ContextObserver } from '@/sidecar/ContextObserver'
 import { FormDetector } from '@/sidecar/FormDetector'
 import { scanPageForms } from '@/sidecar/FormScanner'
 import { ReadingDetector, type ReadingScore } from '@/sidecar/ReadingDetector'
+import { RuleBasedAlgorithm, parseRuleBasedConfig } from '@/sidecar/RuleEngine'
+import { SandboxJSAlgorithm, parseSandboxJSConfig } from '@/sidecar/SandboxJSAlgorithm'
 import { hideSidecarBorder, showSidecarBorder } from '@/sidecar/SidecarBorder'
 import { type SidecarState, isSidecarMessage } from '@/sidecar/SidecarMessaging'
+import { PrefixMatchAlgorithm, SemanticFrequencyAlgorithm } from '@/sidecar/SuggestionEngine'
 
 // import { DEMO_CONFIG } from '@/agent/constants'
 
@@ -164,6 +168,80 @@ function initSidecar() {
 }
 
 function startSidecar(tabId: number) {
+	// Register built-in suggestion algorithms
+	pluginManager.registerBuiltIn(new SemanticFrequencyAlgorithm(), {
+		name: 'semantic_frequency',
+		version: '2.0',
+		description: 'Text similarity of label/name/placeholder + frequency weighting',
+		type: 'builtin',
+	})
+	pluginManager.registerBuiltIn(new PrefixMatchAlgorithm(), {
+		name: 'prefix_match',
+		version: '2.0',
+		description: 'Prefix-based matching against historical input values',
+		type: 'builtin',
+	})
+	loadCustomAlgorithms().catch((err) => {
+		console.warn('[Sidecar] Failed to load custom algorithms:', err)
+	})
+
+	async function loadCustomAlgorithms() {
+		const result = await safeStorageGet('advancedConfig')
+		const advancedConfig = result.advancedConfig as
+			| {
+					algorithms?: {
+						id: string
+						name: string
+						type: string
+						enabled: boolean
+						config?: Record<string, unknown>
+						code?: string
+					}[]
+			  }
+			| undefined
+		if (!advancedConfig?.algorithms?.length) return
+
+		for (const algo of advancedConfig.algorithms) {
+			if (!algo.id || !algo.type || algo.type === 'builtin') continue
+			if (!algo.enabled) continue
+			try {
+				if (algo.type === 'rule_based') {
+					const config = parseRuleBasedConfig(algo.config)
+					if (!config) {
+						console.warn(`[Sidecar] Invalid rule-based config for "${algo.name}"`)
+						continue
+					}
+					pluginManager.registerPlugin(
+						{
+							name: algo.id,
+							version: '1.0',
+							description: config.description || `Custom rule-based algorithm "${algo.name}"`,
+							type: 'rule_based',
+						},
+						new RuleBasedAlgorithm(algo.id, config)
+					)
+				} else if (algo.type === 'sandbox_js') {
+					const config = parseSandboxJSConfig({ ...algo.config, code: algo.code })
+					if (!config) {
+						console.warn(`[Sidecar] Invalid sandbox JS config for "${algo.name}"`)
+						continue
+					}
+					pluginManager.registerPlugin(
+						{
+							name: algo.id,
+							version: '0.1',
+							description: config.description || `Custom sandbox JS algorithm "${algo.name}"`,
+							type: 'sandbox_js',
+						},
+						new SandboxJSAlgorithm(algo.id, config)
+					)
+				}
+			} catch (err) {
+				console.warn(`[Sidecar] Failed to register custom algorithm "${algo.name}":`, err)
+			}
+		}
+	}
+
 	if (sidecarObserver) return
 
 	sidecarObserver = new ContextObserver(tabId, { enabled: true })
@@ -182,12 +260,13 @@ function startSidecar(tabId: number) {
 		})
 	})
 
-	formDetector = new FormDetector(sidecarObserver, (suggestions, fieldLabel) => {
+	formDetector = new FormDetector(sidecarObserver, (suggestions, fieldLabel, sessionId) => {
 		if (!isExtensionContextValid()) return
 		safeStorageSet({
 			[`sidecarForms_${tabId}`]: {
 				suggestions,
 				fieldLabel,
+				sessionId,
 				url: window.location.href,
 				domain: new URL(window.location.href).hostname,
 				timestamp: Date.now(),
@@ -455,6 +534,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse): true | und
 		case 'scan_page_forms': {
 			const result = scanPageForms()
 			sendResponse({ success: true, result })
+			return true
+		}
+
+		case 'record_adoption': {
+			const { sessionId, algorithm, value } = (payload ?? {}) as Record<string, string>
+			if (formDetector && sessionId && algorithm && value) {
+				formDetector.recordAdoption(sessionId, algorithm, value)
+				sendResponse({ success: true })
+			} else {
+				sendResponse({
+					success: false,
+					error: 'Missing parameters or formDetector not initialized',
+				})
+			}
 			return true
 		}
 

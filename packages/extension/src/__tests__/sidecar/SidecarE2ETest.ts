@@ -153,7 +153,7 @@ export async function runSidecarE2ETest(): Promise<void> {
 					useCount: 3,
 				},
 			]
-			const items = algo.compute(field, '', history as any, 3)
+			const items = algo.compute(field, '', history as any, 3, { pageTitle: 'Test', url: 'https://test.com', domain: 'test.com', path: '/' })
 			if (items.length === 0) throw new Error('Bigram match failed: expected at least 1 suggestion')
 			const top = items[0]
 			if (top.value !== 'alice@example.com') throw new Error(`Expected alice@example.com, got ${top.value}`)

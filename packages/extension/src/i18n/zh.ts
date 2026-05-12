@@ -57,6 +57,10 @@ export const zh = {
 		thanks: '谢谢！',
 		useful: '有用',
 		notUseful: '没用',
+		thinking: '思考中...',
+		executing: '执行中',
+		done: '完成',
+		retrying: '重试中',
 	},
 
 	// Reading Card
@@ -84,6 +88,7 @@ export const zh = {
 		semantic: '语义',
 		prefix: '前缀',
 		filled: '已填充',
+		source: '来源',
 	},
 
 	// Chat Input
@@ -121,14 +126,52 @@ export const zh = {
 		experimentalIncludeAllTabs: '实验性包含所有标签页',
 		contextWindow: '上下文窗口（分钟）',
 		contextWindowDesc: '上下文时间轴回溯的时间范围。',
-		suggestionAlgorithms: '建议算法（最多3个）',
+		suggestionAlgorithms: '建议算法（可配置）',
 		algoSemanticFrequency: '语义 + 频率',
 		algoPrefixMatch: '前缀匹配',
-		suggestionAlgorithmsDesc: '每个算法产生1条建议。总数 = 选中数量（最多3）。',
+		suggestionAlgorithmsDesc: '每个算法最多产生5条建议，去重后按置信度排序。',
+		accuracy: '准确率',
+		accuracyHigh: '高可靠性',
+		accuracyModerate: '中等可靠性',
+		accuracyLow: '低可靠性',
+		accuracyUnknown: '数据不足',
+		addCustomAlgorithm: '添加自定义算法',
+		accuracyDataStoredInBrowser:
+			'算法推荐历史数据存储在浏览器 IndexedDB 中。使用导出功能下载为 JSON。',
+		accuracyWindowDays: '推荐历史窗口（天）',
+		accuracyWindowDaysDesc: '纳入推荐历史统计的天数。',
+		enableAccuracyCollection: '收集算法推荐历史数据',
+		exportAccuracyData: '导出算法推荐历史数据',
+		importAccuracyData: '导入算法推荐历史数据',
+		exportSuccess: '导出成功',
+		importSuccess: '导入成功',
+		importError: '导入失败：文件格式无效',
+		clearAccuracyData: '清空算法推荐历史数据',
 		articleSavePath: '文章保存路径',
 		articleSavePathDesc: '自动保存 Markdown 文章的文件夹路径。留空则仅在扩展中存储。',
 		crossTabContextSync: '跨标签页上下文同步',
 		testingApiNotice: '你正在使用测试 API，风险自负。',
+	},
+
+	// Algorithm Config Dialog
+	algorithmDialog: {
+		title: '自定义算法',
+		editTitle: '编辑算法',
+		name: '算法名称',
+		type: '类型',
+		typeRuleBased: '基于规则',
+		typeSandboxJS: '沙箱 JavaScript',
+		config: '配置',
+		code: 'JavaScript 代码',
+		codePlaceholder:
+			'function(field, prefix, history, maxResults) {\n  var results = [];\n  for (var i = 0; i < history.length; i++) {\n    results.push({\n      value: history[i].value,\n      confidence: 0.8,\n      algorithm: "My Algorithm",\n      explanation: "From history",\n      fieldKey: history[i].fieldKey\n    });\n  }\n  return results.slice(0, maxResults);\n}',
+		codeHelp:
+			'函数接收 (field, prefix, history, maxResults)，必须返回 [{ value, confidence, algorithm, explanation, fieldKey }]。',
+		configPlaceholder:
+			'{"rules":[{"fieldKeywords":["email"],"staticValues":[{"value":"user@example.com","score":0.9}]}]}',
+		configHelp:
+			'JSON 对象，包含 "rules" 数组。每条规则可设：fieldKeywords、fieldNamePatterns、prefixes、staticValues、includeHistory、scoreMultiplier。',
+		description: '描述',
 	},
 
 	// History
@@ -246,8 +289,8 @@ export const zh = {
 		failed: '失败',
 		copied: '已复制！',
 		copy: '复制',
-		copySystem: '复制系统提示',
-		copyUser: '复制用户提示',
+		copySystem: '复制系统',
+		copyUser: '复制用户',
 		rawRequest: '原始请求',
 		rawResponse: '原始响应',
 	},
@@ -256,14 +299,6 @@ export const zh = {
 	stepCard: {
 		step: '步骤',
 		actions: '动作',
-	},
-
-	// Activity Card
-	activityCard: {
-		thinking: '思考中...',
-		executing: '执行中',
-		done: '完成',
-		retrying: '重试中',
 	},
 
 	// Footer

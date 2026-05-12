@@ -13,14 +13,18 @@ import type { FormSuggestion } from '@/sidecar/FormDetector'
 interface FormSuggestionBarProps {
 	fieldLabel: string
 	suggestions: FormSuggestion[]
+	sessionId?: string
 	onFill: (value: string) => void
+	onAdopt?: (sessionId: string, algorithm: string, value: string) => void
 	onDismiss?: () => void
 }
 
 export function FormSuggestionBar({
 	fieldLabel,
 	suggestions,
+	sessionId,
 	onFill,
+	onAdopt,
 	onDismiss,
 }: FormSuggestionBarProps) {
 	const { t } = useI18n()
@@ -29,15 +33,18 @@ export function FormSuggestionBar({
 
 	if (dismissed || suggestions.length === 0) return null
 
-	const handleFill = async (value: string) => {
+	const handleFill = async (value: string, algorithm: string) => {
 		onFill(value)
 		setFilled((prev) => new Set(prev).add(value))
+		if (sessionId && onAdopt) {
+			onAdopt(sessionId, algorithm, value)
+		}
 		try {
 			await saveAnnotation({
 				tabId: 0,
 				url: '',
 				domain: '',
-				eventId: `suggestion-fill-${Date.now()}`,
+				eventId: ,
 				label: 'useful',
 				annotatedAt: Date.now(),
 				notes: JSON.stringify({ fieldLabel, value, suggestions }),
@@ -96,7 +103,7 @@ export function FormSuggestionBar({
 				{suggestions.map((s, i) => (
 					<button
 						key={`${s.value}-${i}`}
-						onClick={() => handleFill(s.value)}
+						onClick={() => handleFill(s.value, s.algorithm)}
 						disabled={filled.has(s.value)}
 						className={cn(
 							'w-full flex items-center justify-between rounded-md px-2.5 py-1.5 text-left transition-colors cursor-pointer',
@@ -107,10 +114,16 @@ export function FormSuggestionBar({
 					>
 						<div className="flex items-center gap-2 min-w-0">
 							<span className="text-[11px] font-medium truncate">{s.value}</span>
-							<span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+							<span
+								className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 shrink-0 font-medium"
+								title={s.explanation}
+							>
+								{t.suggestionBar.source}:{' '}
 								{s.algorithm === 'semantic_frequency'
 									? t.suggestionBar.semantic
-									: t.suggestionBar.prefix}
+									: s.algorithm === 'prefix_match'
+										? t.suggestionBar.prefix
+										: s.algorithm}
 							</span>
 						</div>
 						<div className="flex items-center gap-1.5 shrink-0">
